@@ -8,11 +8,10 @@ Rectangle {
     property int currentScale: 240
     property string stockCode: ""
     property string stockName: ""
-    property color bgColor: palette.window
     property color textColor: palette.text
     property color upColor: "red"
     property color downColor: "green"
-    
+    signal scaleSelected(int newScale)
     implicitHeight: contentLayout.implicitHeight + 20
     color: palette.window
 
@@ -42,7 +41,31 @@ Rectangle {
             }
             
             Item { Layout.fillWidth: true }
-            
+
+            RowLayout {
+                property int currentScale: 240
+                property color textColor: palette.text
+                property color gridColor: "#e0e0e0"
+                height: 40
+                spacing: 1
+
+                ButtonGroup { id: scaleGroup }
+
+                Repeater {
+                    model: ["日K", "周K", "月K", "5", "15", "30", "60"]
+                    Button {
+                        text: modelData
+                        flat: true
+                        checked: [240, 240*5, 7200, 5, 15, 30, 60][index] === root.currentScale
+                        ButtonGroup.group: scaleGroup
+                        onClicked: {
+                            var newScale = [240, 240*5, 7200, 5, 15, 30, 60][index]
+                            root.scaleSelected(newScale)
+                            root.currentScale = newScale
+                        }
+                    }
+                }
+            }
         }
 
         GridLayout {
@@ -62,26 +85,6 @@ Rectangle {
                 color: textColor 
             }
             Label { 
-                text: "总股本" 
-                font.bold: true 
-                color: textColor 
-            }
-            Label { 
-                text: "-" 
-                color: textColor 
-            }
-            Label { 
-                text: "成交量" 
-                font.bold: true 
-                color: textColor 
-            }
-            Label { 
-                id: transactionVolume
-                text: "-" 
-                color: textColor 
-            }
-
-            Label { 
                 text: "最低" 
                 font.bold: true 
                 color: textColor 
@@ -92,11 +95,22 @@ Rectangle {
                 color: textColor 
             }
             Label { 
-                text: "流通股本" 
+                text: "今开" 
                 font.bold: true 
                 color: textColor 
             }
             Label { 
+                id: openPrice
+                text: "-" 
+                color: textColor 
+            }
+            Label { 
+                text: "成交量" 
+                font.bold: true 
+                color: textColor 
+            }
+            Label { 
+                id: transactionVolume
                 text: "-" 
                 color: textColor 
             }
@@ -111,32 +125,13 @@ Rectangle {
                 text: "-" 
                 color: textColor 
             }
-
-            Label { 
-                text: "今开" 
-                font.bold: true 
-                color: textColor 
-            }
-            Label { 
-                id: openPrice
-                text: "-" 
-                color: textColor 
-            }
-            Label { 
-                text: "市盈率" 
-                font.bold: true 
-                color: textColor 
-            }
-            Label { 
-                text: "-" 
-                color: textColor 
-            }
             Label { 
                 text: "换手率" 
                 font.bold: true 
                 color: textColor 
             }
             Label { 
+                id: turnoverRate
                 text: "-" 
                 color: textColor 
             }

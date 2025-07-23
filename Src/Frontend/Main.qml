@@ -5,8 +5,8 @@ import QtQuick.Layouts
 
 Window {
     id: mainWindow
-    width: 1080
-    height: 720
+    width: 1280
+    height: 900
     title: qsTr("Stocker")
     visible: true
     flags: Qt.Window | Qt.FramelessWindowHint

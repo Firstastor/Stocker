@@ -106,9 +106,7 @@ Page {
             spacing: 1
             clip: true
             model: StockInfoData
-            
-            // 性能优化设置
-            cacheBuffer: listView.height * 2  // 缓存两屏高度的项目
+            cacheBuffer: listView.height * 2 
             boundsBehavior: Flickable.StopAtBounds
             maximumFlickVelocity: 1500
             flickDeceleration: 2000
@@ -118,8 +116,7 @@ Page {
                 id: delegateItem
                 width: ListView.view.width
                 height: 40
-                
-                // 使用Loader实现懒加载
+
                 Loader {
                     id: itemLoader
                     anchors.fill: parent
@@ -135,8 +132,6 @@ Page {
                         color: mouseArea.containsMouse ? Qt.lighter(palette.highlight, 1.5) : palette.base
                         border.width: 1
                         border.color: palette.mid
-                        
-                        // 简化的鼠标效果
                         scale: mouseArea.pressed ? 0.98 : 1.0
                         Behavior on scale { NumberAnimation { duration: 80 } }
                         Behavior on color { ColorAnimation { duration: 150 } }

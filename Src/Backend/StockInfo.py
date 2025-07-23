@@ -131,7 +131,7 @@ class StockInfoGet(QObject):
                     "收盘价": float(item["close"]),
                     "最高价": float(item["high"]),
                     "最低价": float(item["low"]),
-                    "成交量(手)": int(item["volume"]),
+                    "成交量": int(item["volume"]),
                 })
             return history_data
         except Exception as e:

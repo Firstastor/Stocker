@@ -12,10 +12,6 @@ Page {
     property int currentScale: stockHeader.currentScale
     property int totalYears: 5
 
-    // 颜色定义
-    property color upColor: "red"
-    property color downColor: "green"
-    property color bgColor: palette.base
 
     function setStockData(code, name) {
         stockCode = code
@@ -31,31 +27,23 @@ Page {
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
-        RowLayout {
+
+        StockHeader {
+            id: stockHeader
+            stockCode: root.stockCode
+            stockName: root.stockName
             Layout.fillWidth: true
-
-            // 股票标题栏
-            StockHeader {
-                id: stockHeader
-                stockCode: root.stockCode
-                stockName: root.stockName
-                bgColor: root.bgColor
-                upColor: root.upColor
-                Layout.fillWidth: true
-            }
-
-            ScaleControls {
-                Layout.fillWidth: true
-                onScaleSelected: function(newScale) {
-                    root.currentScale = newScale
-                    root.refreshData() 
-                }
+            onScaleSelected: function(newScale) {
+                root.currentScale = newScale
+                root.refreshData()
             }
         }
 
+
+
         // K线图主体
-        KLineChart {
-            id: klineChart
+        StockChart {
+            id: stockChart
             historyData: root.historyData
             Layout.fillWidth: true
             Layout.fillHeight: true
