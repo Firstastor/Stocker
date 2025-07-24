@@ -29,11 +29,16 @@ Item {
     property real maxVolume: 1
 
     // SMA properties
-    property var smaSettings: [
-        { period: 20, color: "#3498db", visible: true },  // Blue
-        { period: 5, color: "#f39c12", visible: true }    // Orange
-    ]
+    property var smaSettings: []
     property bool showSmaSettingsDialog: false
+
+    // Bollinger Bands properties
+    property bool showBollinger: false
+    property int bollingerPeriod: 20
+    property real bollingerMultiplier: 2.0
+    property color upperBandColor: "#e74c3c"
+    property color lowerBandColor: "#2ecc71"
+    property color middleBandColor: "#3498db"
 
     // Interaction properties
     property bool isDragging: false
@@ -41,18 +46,59 @@ Item {
     property point crosshairPos: Qt.point(0, 0)
     property var hoveredItem: null
 
-    onHistoryDataChanged: updateVisibleData(Math.max(0, historyData.length - visibleDays))
-    onSmaSettingsChanged: mainCanvas.requestPaint()
+    // Cached calculations
+    property var bollingerBandsData: []
+    property var closePrices: []
+
+    onHistoryDataChanged: {
+        // Extract close prices for calculations
+        closePrices = historyData.map(item => item.收盘价)
+        // Pre-calculate Bollinger Bands
+        if (showBollinger) {
+            calculateBollingerBands()
+        }
+        // Pre-calculate SMAs
+        for (var i = 0; i < smaSettings.length; i++) {
+            var setting = smaSettings[i]
+            setting.smaData = calculateSMA(setting.period)
+        }
+        updateVisibleData(Math.max(0, historyData.length - visibleDays))
+    }
+
+    function calculateBollingerBands() {
+        if (historyData.length < bollingerPeriod) {
+            bollingerBandsData = []
+            return
+        }
+        bollingerBandsData = StockCalculate.calculate_bollinger_bands(
+            closePrices, 
+            bollingerPeriod, 
+            bollingerMultiplier, 
+            bollingerMultiplier
+        )
+    }
+
+    function calculateSMA(period) {
+        var smaValues = StockCalculate.calculate_ma(closePrices, period)
+        if (smaValues.length === 0) return []
+        
+        var visibleSMA = []
+        for (var i = 0; i < smaValues.length; i++) {
+            if (i >= startIndex && i < startIndex + visibleDays) {
+                visibleSMA.push({
+                    value: smaValues[i],
+                    index: i
+                })
+            }
+        }
+        return visibleSMA
+    }
 
     function updateVisibleData(newStartIndex) {
         startIndex = Math.max(0, Math.min(newStartIndex, historyData.length - visibleDays))
         visibleData = historyData.slice(startIndex, startIndex + visibleDays)
         calculateVisiblePriceRange()
         calculateMaxVolume()
-        for (var i = 0; i < smaSettings.length; i++) {
-            var setting = smaSettings[i]
-            setting.smaData = calculateSMA(historyData, setting.period)
-        }
         mainCanvas.requestPaint()
     }
 
@@ -61,6 +107,17 @@ Item {
         
         var min = visibleData[0].最低价
         var max = visibleData[0].最高价
+        
+        if (showBollinger && bollingerBandsData.length > 0) {
+            for (var i = 0; i < visibleData.length; i++) {
+                var dataIndex = startIndex + i
+                var bbItem = bollingerBandsData[dataIndex]
+                if (!bbItem) continue
+                
+                min = Math.min(min, bbItem.lower)
+                max = Math.max(max, bbItem.upper)
+            }
+        }
         
         for (var i = 1; i < visibleData.length; i++) {
             min = Math.min(min, visibleData[i].最低价)
@@ -85,29 +142,24 @@ Item {
         maxVolume = maxVol
     }
 
-    function calculateSMA(data, period) {
-        if (data.length < period) return []
-        
-        var fullSMA = []
-        for (var i = period - 1; i < data.length; i++) {
-            var sum = 0
-            for (var j = 0; j < period; j++) {
-                sum += data[i - j].收盘价
-            }
-            fullSMA.push({value: sum / period, index: i})
+    onShowBollingerChanged: {
+        if (showBollinger && bollingerBandsData.length === 0) {
+            calculateBollingerBands()
         }
-        
-        var visibleSMA = []
-        for (var k = 0; k < fullSMA.length; k++) {
-            var smaItem = fullSMA[k]
-            if (smaItem.index >= startIndex && smaItem.index < startIndex + visibleDays) {
-                visibleSMA.push(smaItem)
-            }
-        }
-        return visibleSMA
+        mainCanvas.requestPaint()
     }
 
-    // Main Canvas
+    onSmaSettingsChanged: {
+        // Update SMA calculations for any new or changed settings
+        for (var i = 0; i < smaSettings.length; i++) {
+            var setting = smaSettings[i]
+            if (!setting.smaData || setting.smaData.length === 0) {
+                setting.smaData = calculateSMA(setting.period)
+            }
+        }
+        mainCanvas.requestPaint()
+    }
+
     Canvas {
         id: mainCanvas
         anchors {
@@ -168,6 +220,75 @@ Item {
                     ctx.lineTo(x, height)
                     ctx.stroke()
                 }
+            }
+
+            function drawBollingerBands() {
+                if (!showBollinger || bollingerBandsData.length === 0 || visibleData.length === 0) return
+
+                ctx.lineWidth = 1
+                var bandAlpha = 0.2
+                
+                // 先绘制带状区域
+                ctx.fillStyle = Qt.rgba(0.7, 0.7, 0.9, bandAlpha)
+                ctx.beginPath()
+                var firstPointUpper = true
+                var firstPointLower = true
+                
+                for (var i = 0; i < visibleData.length; i++) {
+                    var dataIndex = startIndex + i
+                    var bbItem = bollingerBandsData[dataIndex]
+                    if (!bbItem) continue
+                    
+                    var x = (i + 0.5) * (barWidth + barSpacing)
+                    var upperY = height - ((bbItem.upper - minPrice) / priceRange * height)
+                    var lowerY = height - ((bbItem.lower - minPrice) / priceRange * height)
+                    
+                    // 上轨路径
+                    if (firstPointUpper) {
+                        ctx.moveTo(x, upperY)
+                        firstPointUpper = false
+                    } else {
+                        ctx.lineTo(x, upperY)
+                    }
+                    
+                    // 下轨路径（逆序）
+                    var lowerX = (visibleData.length - 1 - i + 0.5) * (barWidth + barSpacing)
+                    if (firstPointLower) {
+                        ctx.moveTo(lowerX, lowerY)
+                        firstPointLower = false
+                    } else {
+                        ctx.lineTo(lowerX, lowerY)
+                    }
+                }
+                ctx.closePath()
+                ctx.fill()
+                
+                // 再绘制三条线
+                var drawBandLine = function(color, getY) {
+                    ctx.strokeStyle = color
+                    ctx.beginPath()
+                    var firstPoint = true
+                    for (var j = 0; j < visibleData.length; j++) {
+                        var idx = startIndex + j
+                        var item = bollingerBandsData[idx]
+                        if (!item) continue
+                        
+                        var x = (j + 0.5) * (barWidth + barSpacing)
+                        var y = height - ((getY(item) - minPrice) / priceRange * height)
+                        
+                        if (firstPoint) {
+                            ctx.moveTo(x, y)
+                            firstPoint = false
+                        } else {
+                            ctx.lineTo(x, y)
+                        }
+                    }
+                    ctx.stroke()
+                }
+                
+                drawBandLine(upperBandColor, (item) => item.upper)
+                drawBandLine(middleBandColor, (item) => item.middle)
+                drawBandLine(lowerBandColor, (item) => item.lower)
             }
 
             // 绘制K线
@@ -307,6 +428,7 @@ Item {
 
             // 执行绘制顺序
             drawGridLines()
+            if (showBollinger) drawBollingerBands()
             drawKlines()
             drawVolumes()
             drawSMALines()
@@ -543,6 +665,27 @@ Item {
         }
     }
 
+    // Bollinger Bands Toggle Button
+    Button {
+        id: bollingerToggle
+        width: 100
+        height: 24
+        z: 1
+        anchors.bottom: parent.top
+        anchors.right: addSmaButton.left
+        anchors.margins: 5
+        text: showBollinger ? "隐藏布林带" : "显示布林带"
+        onClicked: showBollinger = !showBollinger
+        
+        contentItem: Text {
+            text: bollingerToggle.text
+            font: bollingerToggle.font
+            color: textColor
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+    }
+
     // SMA Settings Dialog
     Popup {
         id: smaSettingsDialog
@@ -655,7 +798,7 @@ Item {
         id: legend
         spacing: 5
         anchors.bottom: parent.top
-        anchors.right: addSmaButton.left
+        anchors.right: bollingerToggle.left
         anchors.margins: 10
         visible: smaSettings.length > 0
         layoutDirection: Qt.RightToLeft

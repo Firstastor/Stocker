@@ -142,23 +142,80 @@ Rectangle {
         stockCode = code
         stockName = name
         
-        try {
-            for (var i = 0; i < StockInfoData.rowCount(); i++) {
-                var item = StockInfoData.get(i)
-                if (item.代码 === code) {
-                    currentPrice.text = item.最新价
-                    currentPrice.color = item.涨跌 >= 0 ? upColor : downColor
-                    highPrice.text = item.最高 || "-"
-                    lowPrice.text = item.最低 || "-"
-                    openPrice.text = item.今开 || "-"
-                    transactionVolume.text = item.成交量 || "-"
-                    transactionAmount.text = item.成交额 || "-"
-                    break
-                }
-            }
-        } catch (error) {
-            console.error("更新股票数据错误:", error)
+        // 重置所有字段为默认值
+        currentPrice.text = "0.00"
+        currentPrice.color = textColor
+        highPrice.text = "-"
+        lowPrice.text = "-"
+        openPrice.text = "-"
+        transactionVolume.text = "-"
+        transactionAmount.text = "-"
+        turnoverRate.text = "-"
+        
+        // 使用 StockGet 获取股票数据
+        var stockData = StockGet.get_stock_data()
+        
+        if (!stockData || stockData.length === 0) {
+            console.log("未获取到股票数据")
+            return
         }
+        
+        // 查找匹配的股票数据
+        var found = false
+        for (var i = 0; i < stockData.length; i++) {
+            var item = stockData[i]
+            if (item.代码 === code) {
+                found = true
+                
+                // 更新最新价和颜色
+                if (item.最新价 !== undefined) {
+                    currentPrice.text = parseFloat(item.最新价).toFixed(2)
+                    currentPrice.color = item.涨跌 >= 0 ? upColor : downColor
+                }
+                
+                // 更新其他字段
+                if (item.最高 !== undefined) {
+                    highPrice.text = parseFloat(item.最高).toFixed(2)
+                }
+                
+                if (item.最低 !== undefined) {
+                    lowPrice.text = parseFloat(item.最低).toFixed(2)
+                }
+                
+                if (item.今开 !== undefined) {
+                    openPrice.text = parseFloat(item.今开).toFixed(2)
+                }
+                
+                if (item.成交量 !== undefined) {
+                    transactionVolume.text = formatNumber(item.成交量)
+                }
+                
+                if (item.成交额 !== undefined) {
+                    transactionAmount.text = formatNumber(item.成交额) + "万"
+                }
+                
+                // 计算换手率（如果需要）
+                if (item.换手率 !== undefined) {
+                    turnoverRate.text = parseFloat(item.换手率).toFixed(2) + "%"
+                }
+                
+                break
+            }
+        }
+        
+        if (!found) {
+            console.log("未找到股票代码对应的数据:", code)
+        }
+    }
+
+    // 辅助函数：格式化大数字
+    function formatNumber(num) {
+        if (num >= 100000000) {
+            return (num / 100000000).toFixed(2) + "亿"
+        } else if (num >= 10000) {
+            return (num / 10000).toFixed(2) + "万"
+        }
+        return num.toString()
     }
 
 }
