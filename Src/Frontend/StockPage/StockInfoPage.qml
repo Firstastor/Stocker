@@ -6,9 +6,32 @@ import QtQuick.Window
 
 Page {
     id: root
-    property string sortField: ""
+    property string sortField: "代码"
     property bool sortAscending: true
+    property string filterString: ""
+    property var stockData: []
+    
     signal stockSelected(string code, string name)
+    
+    function updateSort(field) {
+        if (sortField === field) {
+            sortAscending = !sortAscending
+        } else {
+            sortField = field
+            sortAscending = true
+        }
+        applySortAndFilter()
+    }
+    
+    function applySortAndFilter() {
+        var filtered = StockGet.filter_stock_data(searchField.text)
+        stockData = StockGet.sort_stock_data(filtered, sortField, sortAscending)
+    }
+    
+    Component.onCompleted: {
+        // Initialize with all stock data
+        stockData = StockGet.get_stock_data()
+    }
     
     ColumnLayout {
         anchors.fill: parent
@@ -24,13 +47,13 @@ Page {
             rightPadding: 10
             topPadding: 8
             bottomPadding: 8
-            onTextChanged: {
-                StockData.setFilterString(text)
-            }
             background: Rectangle {
                 color: "transparent"
                 border.color: palette.mid
                 radius: 4
+            }
+            onTextChanged: {
+                applySortAndFilter()
             }
         }
 
@@ -41,7 +64,6 @@ Page {
             spacing: 1
             height: 40
 
-            // 代码表头
             HeaderButton {
                 text: qsTr("代码")
                 Layout.preferredWidth: root.width/5 
@@ -51,7 +73,6 @@ Page {
                 onClicked: updateSort("代码")
             }
 
-            // 名称表头
             HeaderButton {
                 text: qsTr("名称")
                 Layout.preferredWidth: root.width/5
@@ -61,7 +82,6 @@ Page {
                 onClicked: updateSort("名称")
             }
 
-            // 最新价表头
             HeaderButton {
                 text: qsTr("最新价")
                 Layout.preferredWidth: root.width/5
@@ -71,7 +91,6 @@ Page {
                 onClicked: updateSort("最新价")
             }
 
-            // 涨幅表头
             HeaderButton {
                 text: qsTr("涨幅")
                 Layout.preferredWidth: root.width/5
@@ -81,7 +100,6 @@ Page {
                 onClicked: updateSort("涨幅")
             }
 
-            // 涨跌表头
             HeaderButton {
                 text: qsTr("涨跌")
                 Layout.preferredWidth: root.width/5
@@ -92,9 +110,6 @@ Page {
             }
         }
 
-        ListModel {
-            id: stockModel
-        }
         // 股票列表
         ListView {
             id: listView
@@ -102,97 +117,82 @@ Page {
             Layout.fillHeight: true
             spacing: 1
             clip: true
-            model: stockModel
-            cacheBuffer: listView.height * 2 
+            model: stockData
+            cacheBuffer: 400
             boundsBehavior: Flickable.StopAtBounds
             maximumFlickVelocity: 1500
             flickDeceleration: 2000
+            
             delegate: Item {
                 id: delegateItem
                 width: ListView.view.width
                 height: 40
 
-                Loader {
-                    id: itemLoader
+                Rectangle {
+                    id: contentItem
                     anchors.fill: parent
-                    sourceComponent: actualDelegate
-                    active: listView.visible
-                }
-                
-                Component {
-                    id: actualDelegate
-                    Rectangle {
-                        id: contentItem
-                        anchors.fill: parent
-                        color: mouseArea.containsMouse ? Qt.lighter(palette.highlight, 1.5) : palette.base
-                        border.width: 1
-                        border.color: palette.mid
-                        Behavior on scale { NumberAnimation { duration: 80 } }
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                    color: mouseArea.containsMouse ? Qt.lighter(palette.highlight, 1.5) : palette.base
+                    border.width: 1
+                    border.color: palette.mid
+                    Behavior on color { ColorAnimation { duration: 150 } }
 
-                        MouseArea {
-                            id: mouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: root.stockSelected(model.代码, model.名称)
+                    MouseArea {
+                        id: mouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: root.stockSelected(modelData.代码, modelData.名称)
+                    }
+
+                    RowLayout {
+                        anchors.fill: parent
+                        spacing: 1
+
+                        Text {
+                            text: modelData.代码
+                            color: mouseArea.containsMouse ? palette.highlightedText : palette.text
+                            Layout.preferredWidth: root.width/5
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 12
                         }
 
-                        RowLayout {
-                            anchors.fill: parent
-                            spacing: 1
+                        Text {
+                            text: modelData.名称
+                            color: mouseArea.containsMouse ? palette.highlightedText : palette.text
+                            Layout.preferredWidth: root.width/5
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 12
+                        }
 
-                            // 代码列
-                            Text {
-                                text: model.代码
-                                color: mouseArea.containsMouse ? palette.highlightedText : palette.text
-                                Layout.preferredWidth: root.width/5
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pixelSize: 12
-                            }
+                        Text {
+                            text: modelData.最新价.toFixed(2)
+                            Layout.preferredWidth: root.width/5
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: getPriceColor(modelData.涨跌, mouseArea.containsMouse)
+                        }
 
-                            // 名称列
-                            Text {
-                                text: model.名称
-                                color: mouseArea.containsMouse ? palette.highlightedText : palette.text
-                                Layout.preferredWidth: root.width/5
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pixelSize: 12
-                            }
+                        Text {
+                            text: modelData.涨幅.toFixed(2) + "%"
+                            Layout.preferredWidth: root.width/5
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: getPriceColor(modelData.涨幅, mouseArea.containsMouse)
+                        }
 
-                            // 最新价列
-                            Text {
-                                text: model.最新价
-                                Layout.preferredWidth: root.width/5
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pixelSize: 12
-                                font.bold: true
-                                color: getPriceColor(model.涨跌, mouseArea.containsMouse)
-                            }
-
-                            // 涨幅列
-                            Text {
-                                text: model.涨幅 + "%"
-                                Layout.preferredWidth: root.width/5
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pixelSize: 12
-                                font.bold: true
-                                color: getPriceColor(model.涨幅, mouseArea.containsMouse)
-                            }
-
-                            // 涨跌列
-                            Text {
-                                text: model.涨跌
-                                Layout.preferredWidth: root.width/5
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pixelSize: 12
-                                font.bold: true
-                                color: getPriceColor(model.涨跌, mouseArea.containsMouse)
-                            }
+                        Text {
+                            text: modelData.涨跌.toFixed(2)
+                            Layout.preferredWidth: root.width/5
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            font.pixelSize: 12
+                            font.bold: true
+                            color: getPriceColor(modelData.涨跌, mouseArea.containsMouse)
                         }
                     }
                 }
@@ -227,7 +227,6 @@ Page {
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
-            textFormat: Text.RichText
         }
         background: Rectangle {
             color: parent.down ? Qt.darker(palette.mid, 1.2) : 
@@ -236,30 +235,12 @@ Page {
         }
     }
 
-    Component.onCompleted: {
-        var stockData = StockGet.get_stock_data();
-        if (stockData) {
-            for (var i = 0; i < stockData.length; i++) {
-                stockModel.append(stockData[i]);
-            }
-        }
-    }
-
-    // 更新排序逻辑
-    function updateSort(field) {
-        if (root.sortField === field) {
-            root.sortAscending = !root.sortAscending
-        } else {
-            root.sortField = field
-            root.sortAscending = true
-        }
-        StockData.sortByField(root.sortField, root.sortAscending)
-    }
-
-    // 获取价格颜色
     function getPriceColor(value, isHovered) {
-        if (value > 0) return "red"
-        if (value < 0) return "green" 
+        if (value > 0) {
+            return isHovered ? "#aaffaa" : "#00aa00"
+        } else if (value < 0) {
+            return isHovered ? "#ffaaaa" : "#aa0000"
+        }
         return isHovered ? palette.highlightedText : palette.text
     }
 }

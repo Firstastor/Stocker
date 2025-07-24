@@ -5,7 +5,7 @@ import aiohttp, asyncio
 import json
 import numpy as np
 import pandas as pd
-from PySide6.QtCore import Qt, QObject, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, Signal, Slot
 import talib
 
 class StockCalculate(QObject):
@@ -76,14 +76,7 @@ class StockCalculate(QObject):
             }
             results.append(result_item)
         return results
-
-    @Slot('QVariantList', int, result='QVariantList')
-    def calculate_ma(self, close_prices, period):
-        """计算移动平均线"""
-        if len(close_prices) < period:
-            return []
-        return talib.MA(np.array(close_prices), timeperiod=period).tolist()
-     
+  
     @Slot('QVariantList', int, int, int, result='QVariantList')
     def calculate_macd(self, close_prices, fastperiod=12, slowperiod=26, signalperiod=9):
         """计算MACD"""
@@ -114,13 +107,19 @@ class StockCalculate(QObject):
     
     @Slot('QVariantList', int, result='QVariantList')
     def calculate_rsi(self, close_prices, period=14):
+
         """计算RSI"""
         if len(close_prices) < period:
             return []
         return talib.RSI(np.array(close_prices), timeperiod=period).tolist()
+    
+    @Slot('QVariantList', int, result='QVariantList')
+    def calculate_sma(self, close_prices, period):
+        """计算简单移动平均线"""
+        if len(close_prices) < period:
+            return []
+        return talib.SMA(np.array(close_prices), timeperiod=period).tolist()    
         
-
-
 class StockGet(QObject):          
     def __init__(self, parent=None):
         super().__init__(parent)  
@@ -131,10 +130,55 @@ class StockGet(QObject):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Referer": "https://finance.sina.com.cn/"
         }
-    
+        self.stock_data = []
+
     fetch_stock_data = Signal(list)
     fetch_history_stock_data = Signal(list)
-    
+
+    @Slot('QVariantList', str, bool, result='QVariantList')
+    def sort_stock_data(self, data, field, ascending):
+        """排序数据
+        :param data: 要排序的数据列表
+        :param field: 排序字段
+        :param ascending: 是否升序
+        :return: 排序后的列表
+        """
+        if not data:
+            return []
+        
+        try:
+            reverse = not ascending
+            sorted_data = sorted(
+                data,
+                key=lambda x: x.get(field, 0),
+                reverse=reverse
+            )
+            return sorted_data
+        except Exception as e:
+            print(f"排序错误: {str(e)}")
+            return data
+
+    @Slot(str, result='QVariantList')
+    def filter_stock_data(self, search_text):
+        """过滤数据"""
+        if not self.stock_data:
+            return []
+        
+        if not search_text:
+            return self.stock_data
+        
+        try:
+            search_lower = search_text.lower()
+            filtered = [
+                item for item in self.stock_data
+                if (search_lower in item["代码"].lower() or 
+                    search_lower in item["名称"].lower())
+            ]
+            return filtered
+        except Exception as e:
+            print(f"Filtering error: {str(e)}")
+            return self.stock_data
+     
     async def fetch_stock_data(self, session, stock_codes):
         """获取单支股票实时数据"""
         url = f"{self.base_url}{','.join(stock_codes)}"
@@ -294,7 +338,7 @@ class StockGet(QObject):
         async with aiohttp.ClientSession() as session:
             return await self.fetch_history_stock_data(session, stock_code, scale, datalen)
         
-    @Slot(str, int, int, result=list)
+    @Slot(str, int, int, result='QVariantList')
     def get_history_stock_data(self, stock_code, scale=240, datalen=1000):
         """获取单支股票历史数据"""
         return asyncio.run(self.async_get_history_stock_data(stock_code, scale, datalen))
@@ -303,80 +347,191 @@ class StockGet(QObject):
         """异步获取股票数据"""
         return await self.get_all_stocks()
     
-    @Slot(result=list)
+    @Slot(result='QVariantList')
     def get_stock_data(self):
         """获取股票数据"""
-        return asyncio.run(self.async_get_stock_data())
+        self.stock_data = asyncio.run(self.async_get_stock_data())
+        return self.stock_data
     
-class StockUpdater:
-    def __init__(self, stock_get: StockGet):
-        self.stock_get = stock_get
-        
-        # 数据更新定时器
-        self.fetch_timer = QTimer()
-        self.fetch_timer.setTimerType(Qt.VeryCoarseTimer)
-        self.fetch_timer.timeout.connect(self._safe_fetch)
-        
-        # 分批处理定时器
-        self.batch_timer = QTimer()
-        self.batch_timer.setInterval(300)
-        self.batch_timer.timeout.connect(self._process_buffer)
-        
-        self._update_buffer = None
-        self._is_fetching = False
+import lightgbm as lgb
+import torch
+import torch.nn as nn
+from sklearn.preprocessing import MinMaxScaler
 
-    def _safe_fetch(self):
-        """安全获取数据，避免重叠请求"""
-        if not self._is_fetching:
-            self._is_fetching = True
-            try:
-                asyncio.run(self._fetch_data())
-            finally:
-                self._is_fetching = False
+class StockPrediction(QObject):
+    """股票预测类（集成LightGBM和LSTM模型）"""
+    training_progress = Signal(int, str)  # 训练进度信号（进度百分比, 状态消息）
 
-    async def _fetch_data(self):
-        """异步获取数据并存入缓冲区"""
-        new_data = await self.stock_get.get_stock_data()
-        # 合并到缓冲区
-        if self._update_buffer is not None:
-            self._update_buffer = pd.concat([self._update_buffer, new_data]).drop_duplicates(subset=['代码'], keep='last')
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # LightGBM相关
+        self.lgb_model = None
+        self.lgb_scaler = MinMaxScaler()
+        
+        # LSTM相关
+        self.lstm_model = None
+        self.lstm_scaler = MinMaxScaler()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # ==================== LightGBM 部分 ====================
+    def train_lgbm(self, X_train, y_train, params=None):
+        """训练LightGBM模型"""
+        try:
+            # 数据标准化
+            X_train_scaled = self.lgb_scaler.fit_transform(X_train)
+            
+            # 默认参数（针对股票预测优化）
+            if params is None:
+                params = {
+                    'objective': 'regression',
+                    'metric': 'rmse',
+                    'num_leaves': 63,
+                    'learning_rate': 0.01,
+                    'feature_fraction': 0.8,
+                    'bagging_fraction': 0.8,
+                    'bagging_freq': 5,
+                    'verbose': -1
+                }
+            
+            # 训练模型
+            train_data = lgb.Dataset(X_train_scaled, label=y_train)
+            self.lgb_model = lgb.train(
+                params,
+                train_data,
+                num_boost_round=200,
+                callbacks=[self._lgb_callback]
+            )
+            return True
+        except Exception as e:
+            self.training_progress.emit(0, f"LightGBM训练错误: {str(e)}")
+            return False
+
+    def _lgb_callback(self, env):
+        """LightGBM训练进度回调"""
+        progress = int(env.iteration / env.end_iteration * 100)
+        self.training_progress.emit(progress, "LightGBM训练中...")
+
+    # ==================== LSTM 部分 ====================
+    class LSTMModel(nn.Module):
+        """PyTorch LSTM模型定义"""
+        def __init__(self, input_size=1, hidden_size=50, num_layers=2, output_size=1):
+            super().__init__()
+            self.hidden_size = hidden_size
+            self.num_layers = num_layers
+            self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+            self.fc = nn.Linear(hidden_size, output_size)
+        
+        def forward(self, x):
+            h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+            c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+            out, _ = self.lstm(x, (h0, c0))
+            out = self.fc(out[:, -1, :])
+            return out
+
+    def train_lstm(self, X_train, y_train, epochs=100, seq_length=30):
+        """训练LSTM模型"""
+        try:
+            # 数据预处理
+            X_train_scaled = self.lstm_scaler.fit_transform(X_train)
+            y_train = y_train.reshape(-1, 1)
+            
+            # 转换为序列数据
+            X, y = self._create_sequences(X_train_scaled, y_train, seq_length)
+            
+            # 转换为PyTorch张量
+            X_tensor = torch.FloatTensor(X).to(self.device)
+            y_tensor = torch.FloatTensor(y).to(self.device)
+            
+            # 初始化模型
+            self.lstm_model = self.LSTMModel(
+                input_size=X_train.shape[1],
+                hidden_size=64,
+                num_layers=2
+            ).to(self.device)
+            
+            # 定义损失函数和优化器
+            criterion = nn.MSELoss()
+            optimizer = torch.optim.Adam(self.lstm_model.parameters(), lr=0.001)
+            
+            # 训练循环
+            for epoch in range(epochs):
+                optimizer.zero_grad()
+                outputs = self.lstm_model(X_tensor)
+                loss = criterion(outputs, y_tensor)
+                loss.backward()
+                optimizer.step()
+                
+                # 发射训练进度信号
+                progress = int((epoch + 1) / epochs * 100)
+                self.training_progress.emit(
+                    progress, 
+                    f"LSTM训练中 (Epoch {epoch+1}/{epochs}) Loss: {loss.item():.4f}"
+                )
+            return True
+        except Exception as e:
+            self.training_progress.emit(0, f"LSTM训练错误: {str(e)}")
+            return False
+
+    def _create_sequences(self, data, targets, seq_length):
+        """创建时间序列数据"""
+        X, y = [], []
+        for i in range(len(data) - seq_length):
+            X.append(data[i:i+seq_length])
+            y.append(targets[i+seq_length])
+        return np.array(X), np.array(y)
+
+    def predict_lstm(self, X_test, seq_length=30):
+        """使用LSTM进行预测"""
+        if self.lstm_model is None:
+            raise ValueError("LSTM模型未训练！")
+            
+        # 数据预处理
+        X_test_scaled = self.lstm_scaler.transform(X_test)
+        
+        # 转换为序列数据
+        X_seq = []
+        for i in range(len(X_test_scaled) - seq_length + 1):
+            X_seq.append(X_test_scaled[i:i+seq_length])
+        X_seq = np.array(X_seq)
+        
+        # 预测
+        with torch.no_grad():
+            X_tensor = torch.FloatTensor(X_seq).to(self.device)
+            preds = self.lstm_model(X_tensor).cpu().numpy()
+        
+        return preds.flatten()
+
+    # ==================== 通用功能 ====================
+    def save_model(self, model_type, filepath):
+        """保存指定类型的模型"""
+        if model_type == "lgbm":
+            if self.lgb_model:
+                self.lgb_model.save_model(filepath)
+            else:
+                raise ValueError("LightGBM模型未训练")
+        elif model_type == "lstm":
+            if self.lstm_model:
+                torch.save({
+                    'model_state_dict': self.lstm_model.state_dict(),
+                    'scaler_params': {
+                        'scale_': self.lstm_scaler.scale_,
+                        'min_': self.lstm_scaler.min_
+                    }
+                }, filepath)
+            else:
+                raise ValueError("LSTM模型未训练")
         else:
-            self._update_buffer = new_data.copy()
-        
-        if not self.batch_timer.isActive():
-            self.batch_timer.start()
+            raise ValueError("不支持的模型类型")
 
-    def _process_buffer(self):
-        """处理缓冲区中的分批数据"""
-        if self._update_buffer is None or self._update_buffer.empty:
-            self.batch_timer.stop()
-            return
-
-        batch_size = 100
-        update_rows = self._update_buffer.iloc[:batch_size]
-        self._update_buffer = self._update_buffer.iloc[batch_size:] if len(self._update_buffer) > batch_size else None
-
-        if not update_rows.empty:
-            update_rows = update_rows.set_index('代码')
-            mask = self.stock_info_process._data['代码'].isin(update_rows.index)
-
-            for col in update_rows.columns:
-                if col in self.stock_info_process._data.columns:
-                    updates = update_rows[col].to_dict()
-                    self.stock_info_process._data.loc[mask, col] = self.stock_info_process._data.loc[mask, '代码'].map(updates)
-            changed_indices = self.stock_info_process._data.index[mask]
-
-            if not changed_indices.empty:
-                top_left = self.stock_info_process.index(changed_indices.min(), 0)
-                bottom_right = self.stock_info_process.index(changed_indices.max(), len(self.stock_info_process._data.columns) - 1)
-                self.stock_info_process.dataChanged.emit(top_left, bottom_right)
-
-    def start(self, fetch_interval: int = 5000):
-        """启动定时器"""
-        self.fetch_timer.start(fetch_interval) 
-        
-    def stop(self):
-        """停止所有定时器"""
-        self.fetch_timer.stop()
-        self.batch_timer.stop()
-
+    def load_model(self, model_type, filepath):
+        """加载预训练模型"""
+        if model_type == "lgbm":
+            self.lgb_model = lgb.Booster(model_file=filepath)
+        elif model_type == "lstm":
+            checkpoint = torch.load(filepath)
+            self.lstm_model = self.LSTMModel().to(self.device)
+            self.lstm_model.load_state_dict(checkpoint['model_state_dict'])
+            self.lstm_scaler.scale_ = checkpoint['scaler_params']['scale_']
+            self.lstm_scaler.min_ = checkpoint['scaler_params']['min_']
+        else:
+            raise ValueError("不支持的模型类型")

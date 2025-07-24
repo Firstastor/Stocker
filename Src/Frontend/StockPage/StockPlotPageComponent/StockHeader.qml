@@ -194,11 +194,6 @@ Rectangle {
                     transactionAmount.text = formatNumber(item.成交额) + "万"
                 }
                 
-                // 计算换手率（如果需要）
-                if (item.换手率 !== undefined) {
-                    turnoverRate.text = parseFloat(item.换手率).toFixed(2) + "%"
-                }
-                
                 break
             }
         }
@@ -208,7 +203,6 @@ Rectangle {
         }
     }
 
-    // 辅助函数：格式化大数字
     function formatNumber(num) {
         if (num >= 100000000) {
             return (num / 100000000).toFixed(2) + "亿"

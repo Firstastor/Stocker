@@ -29,8 +29,8 @@ Item {
     property real maxVolume: 1
 
     // SMA properties
-    property var smaSettings: []
-    property bool showSmaSettingsDialog: false
+    property var maSettings: []
+    property bool showMaSettingsDialog: false
 
     // Bollinger Bands properties
     property bool showBollinger: false
@@ -51,16 +51,13 @@ Item {
     property var closePrices: []
 
     onHistoryDataChanged: {
-        // Extract close prices for calculations
         closePrices = historyData.map(item => item.收盘价)
-        // Pre-calculate Bollinger Bands
         if (showBollinger) {
             calculateBollingerBands()
         }
-        // Pre-calculate SMAs
-        for (var i = 0; i < smaSettings.length; i++) {
-            var setting = smaSettings[i]
-            setting.smaData = calculateSMA(setting.period)
+        for (var i = 0; i < maSettings.length; i++) {
+            var setting = maSettings[i]
+            setting.maData = calculateMA(setting.period, setting.type)
         }
         updateVisibleData(Math.max(0, historyData.length - visibleDays))
     }
@@ -78,20 +75,22 @@ Item {
         )
     }
 
-    function calculateSMA(period) {
-        var smaValues = StockCalculate.calculate_ma(closePrices, period)
-        if (smaValues.length === 0) return []
+    function calculateMA(period, type) {
+        var maValues = type === "EMA" 
+            ? StockCalculate.calculate_ema(closePrices, period)
+            : StockCalculate.calculate_sma(closePrices, period)
+        if (maValues.length === 0) return []
         
-        var visibleSMA = []
-        for (var i = 0; i < smaValues.length; i++) {
+        var visibleMA = []
+        for (var i = 0; i < maValues.length; i++) {
             if (i >= startIndex && i < startIndex + visibleDays) {
-                visibleSMA.push({
-                    value: smaValues[i],
+                visibleMA.push({
+                    value: maValues[i],
                     index: i
                 })
             }
         }
-        return visibleSMA
+        return visibleMA
     }
 
     function updateVisibleData(newStartIndex) {
@@ -149,12 +148,12 @@ Item {
         mainCanvas.requestPaint()
     }
 
-    onSmaSettingsChanged: {
-        // Update SMA calculations for any new or changed settings
-        for (var i = 0; i < smaSettings.length; i++) {
-            var setting = smaSettings[i]
-            if (!setting.smaData || setting.smaData.length === 0) {
-                setting.smaData = calculateSMA(setting.period)
+    onMaSettingsChanged: {
+        // Update MA calculations for any new or changed settings
+        for (var i = 0; i < maSettings.length; i++) {
+            var setting = maSettings[i]
+            if (!setting.maData || setting.maData.length === 0) {
+                setting.maData = calculateMA(setting.period, setting.type)
             }
         }
         mainCanvas.requestPaint()
@@ -223,47 +222,6 @@ Item {
             }
 
             function drawBollingerBands() {
-                if (!showBollinger || bollingerBandsData.length === 0 || visibleData.length === 0) return
-
-                ctx.lineWidth = 1
-                var bandAlpha = 0.2
-                
-                // 先绘制带状区域
-                ctx.fillStyle = Qt.rgba(0.7, 0.7, 0.9, bandAlpha)
-                ctx.beginPath()
-                var firstPointUpper = true
-                var firstPointLower = true
-                
-                for (var i = 0; i < visibleData.length; i++) {
-                    var dataIndex = startIndex + i
-                    var bbItem = bollingerBandsData[dataIndex]
-                    if (!bbItem) continue
-                    
-                    var x = (i + 0.5) * (barWidth + barSpacing)
-                    var upperY = height - ((bbItem.upper - minPrice) / priceRange * height)
-                    var lowerY = height - ((bbItem.lower - minPrice) / priceRange * height)
-                    
-                    // 上轨路径
-                    if (firstPointUpper) {
-                        ctx.moveTo(x, upperY)
-                        firstPointUpper = false
-                    } else {
-                        ctx.lineTo(x, upperY)
-                    }
-                    
-                    // 下轨路径（逆序）
-                    var lowerX = (visibleData.length - 1 - i + 0.5) * (barWidth + barSpacing)
-                    if (firstPointLower) {
-                        ctx.moveTo(lowerX, lowerY)
-                        firstPointLower = false
-                    } else {
-                        ctx.lineTo(lowerX, lowerY)
-                    }
-                }
-                ctx.closePath()
-                ctx.fill()
-                
-                // 再绘制三条线
                 var drawBandLine = function(color, getY) {
                     ctx.strokeStyle = color
                     ctx.beginPath()
@@ -336,30 +294,29 @@ Item {
                 }
             }
 
-            // 绘制均线
-            function drawSMALines() {
-                for (var l = 0; l < smaSettings.length; l++) {
-                    var setting = smaSettings[l]
-                    if (!setting.visible || !setting.smaData) continue
+            function drawMALines() {
+                for (var l = 0; l < maSettings.length; l++) {
+                    var setting = maSettings[l]
+                    if (!setting.visible || !setting.maData) continue
                     
                     ctx.strokeStyle = setting.color
                     ctx.lineWidth = 1.5
                     ctx.beginPath()
                     
                     var firstPoint = true
-                    for (var m = 0; m < setting.smaData.length; m++) {
-                        var smaItem = setting.smaData[m]
-                        var relativeIndex = smaItem.index - startIndex
+                    for (var m = 0; m < setting.maData.length; m++) {
+                        var maItem = setting.maData[m]
+                        var relativeIndex = maItem.index - startIndex
                         if (relativeIndex < 0 || relativeIndex >= visibleData.length) continue
                         
-                        var smaX = (relativeIndex + 0.5) * (barWidth + barSpacing)
-                        var smaY = height - ((smaItem.value - minPrice) / priceRange * height)
+                        var maX = (relativeIndex + 0.5) * (barWidth + barSpacing)
+                        var maY = height - ((maItem.value - minPrice) / priceRange * height)
                         
                         if (firstPoint) {
-                            ctx.moveTo(smaX, smaY)
+                            ctx.moveTo(maX, maY)
                             firstPoint = false
                         } else {
-                            ctx.lineTo(smaX, smaY)
+                            ctx.lineTo(maX, maY)
                         }
                     }
                     ctx.stroke()
@@ -428,10 +385,10 @@ Item {
 
             // 执行绘制顺序
             drawGridLines()
-            if (showBollinger) drawBollingerBands()
             drawKlines()
+            if (showBollinger) drawBollingerBands()
             drawVolumes()
-            drawSMALines()
+            drawMALines()
             drawCrosshair()
         }
 
@@ -643,9 +600,8 @@ Item {
         }
     }
 
-    // SMA Settings Button
     Button {
-        id: addSmaButton
+        id: addMaButton
         width: 24
         height: 24
         z: 1
@@ -654,25 +610,23 @@ Item {
         anchors.margins: 5
         text: "+"
         font.pixelSize: 16
-        onClicked: showSmaSettingsDialog = true
-        
+        onClicked: showMaSettingsDialog = true
         contentItem: Text {
-            text: addSmaButton.text
-            font: addSmaButton.font
+            text: addMaButton.text
+            font: addMaButton.font
             color: textColor
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
     }
 
-    // Bollinger Bands Toggle Button
     Button {
         id: bollingerToggle
         width: 100
         height: 24
         z: 1
         anchors.bottom: parent.top
-        anchors.right: addSmaButton.left
+        anchors.right: addMaButton.left
         anchors.margins: 5
         text: showBollinger ? "隐藏布林带" : "显示布林带"
         onClicked: showBollinger = !showBollinger
@@ -686,14 +640,13 @@ Item {
         }
     }
 
-    // SMA Settings Dialog
     Popup {
-        id: smaSettingsDialog
-        visible: showSmaSettingsDialog
-        width: 200
-        height: 180
+        id: maSettingsDialog
+        visible: showMaSettingsDialog
+        width: 220
+        height: 220
         x: parent.width - width - 5
-        y: addSmaButton.y + addSmaButton.height + 5
+        y: addMaButton.y + addMaButton.height + 5
         modal: true
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
@@ -717,9 +670,19 @@ Item {
             }
             
             RowLayout {
+                Label { text: "类型:" }
+                ComboBox {
+                    id: maType
+                    Layout.fillWidth: true
+                    model: ["SMA", "EMA"]
+                    currentIndex: 0
+                }
+            }
+            
+            RowLayout {
                 Label { text: "周期:" }
                 TextField {
-                    id: smaPeriod
+                    id: maPeriod
                     Layout.fillWidth: true
                     text: "20"
                     inputMethodHints: Qt.ImhDigitsOnly
@@ -757,23 +720,25 @@ Item {
                     text: "添加"
                     Layout.fillWidth: true
                     onClicked: {
-                        var period = parseInt(smaPeriod.text)
+                        var period = parseInt(maPeriod.text)
+                        var type = maType.currentText
                         var color = colorDialog.selectedColor.toString()
-                        var existingIndex = smaSettings.findIndex(function(item) {
-                            return item.period === period
+                        var existingIndex = maSettings.findIndex(function(item) {
+                            return item.period === period && item.type === type
                         })
                         if (existingIndex >= 0) {
-                            smaSettings[existingIndex].color = color
+                            maSettings[existingIndex].color = color
                         } else {
-                            var newSma = {
+                            var newMa = {
                                 period: period,
+                                type: type,
                                 color: color,
                                 visible: true
                             }
-                            smaSettings.push(newSma)
+                            maSettings.push(newMa)
                         }
-                        smaSettings = smaSettings.slice()
-                        showSmaSettingsDialog = false
+                        maSettings = maSettings.slice()
+                        showMaSettingsDialog = false
                         updateVisibleData(startIndex)
                     }
                 }
@@ -781,7 +746,7 @@ Item {
                 Button {
                     text: "取消"
                     Layout.fillWidth: true
-                    onClicked: showSmaSettingsDialog = false
+                    onClicked: showMaSettingsDialog = false
                 }
             }
         }
@@ -793,18 +758,17 @@ Item {
         selectedColor: "#3498db"
     }
 
-    // SMA Legend
     Row {
         id: legend
         spacing: 5
         anchors.bottom: parent.top
         anchors.right: bollingerToggle.left
         anchors.margins: 10
-        visible: smaSettings.length > 0
+        visible: maSettings.length > 0
         layoutDirection: Qt.RightToLeft
         
         Repeater {
-            model: smaSettings
+            model: maSettings
             
             delegate: Rectangle {
                 color: "transparent"
@@ -815,15 +779,15 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     onClicked: {
-                        smaSettings.splice(index, 1)
-                        smaSettings = smaSettings.slice()
+                        maSettings.splice(index, 1)
+                        maSettings = maSettings.slice()
                     }
                 }
                 
                 Row {
                     spacing: 5
                     Text {
-                        text: "M" + modelData.period
+                        text: modelData.type + modelData.period
                         color: textColor
                         font.pixelSize: 10
                     }

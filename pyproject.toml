@@ -6,10 +6,13 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "aiohttp>=3.12.14",
+    "lightgbm>=4.6.0",
     "pandas>=2.3.1",
     "pyside6>=6.9.1",
     "requests>=2.32.4",
+    "scikit-learn>=1.7.1",
     "ta-lib",
+    "torch>=2.7.1",
 ]
 
 [[tool.uv.index]]
