@@ -11,13 +11,9 @@ dependencies = [
     "pyside6>=6.9.1",
     "requests>=2.32.4",
     "scikit-learn>=1.7.1",
-    "ta-lib",
-    "torch>=2.7.1",
+    "ta-lib>=0.6.4",
 ]
 
 [[tool.uv.index]]
 url = "http://pypi.tuna.tsinghua.edu.cn/simple"
 default = true
-
-[tool.uv.sources]
-ta-lib = { path = "ta_lib-0.6.4-cp313-cp313-win_amd64.whl" }

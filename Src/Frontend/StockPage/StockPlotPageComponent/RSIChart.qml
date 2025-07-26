@@ -15,7 +15,7 @@ Item {
     property var visibleRsi: []
 
     property color textColor: palette.text
-    property color gridColor: "#e0e0e0"
+    property color gridColor: palette.mid
     property color rsiLineColor: "#3498db"
     property color overboughtColor: "red"
     property color oversoldColor: "green"

@@ -14,7 +14,7 @@ Item {
     property var visibleKdj: []
 
     property color textColor: palette.text
-    property color gridColor: "#e0e0e0"
+    property color gridColor: palette.mid
     property color kLineColor: "#3498db"
     property color dLineColor: "#f39c12"
     property color jLineColor: "#9b59b6"

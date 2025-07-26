@@ -20,7 +20,7 @@ Item {
     property color upColor: "red"   
     property color downColor: "Green" 
     property color textColor: palette.text
-    property color gridColor: "#e0e0e0"
+    property color gridColor: palette.mid
     property color crosshairColor: "#808080"
 
     // Volume properties
@@ -39,6 +39,12 @@ Item {
     property color upperBandColor: "#e74c3c"
     property color lowerBandColor: "#2ecc71"
     property color middleBandColor: "#3498db"
+
+    // 技术指标属性
+    property string currentIndicator: "无"
+    property bool showMacd: false
+    property bool showRsi: false
+    property bool showKdj: false
 
     // Interaction properties
     property bool isDragging: false
@@ -369,7 +375,7 @@ Item {
                 ctx.fillRect(crosshairPos.x - 30, height - 20, 60, 20)
                 ctx.strokeRect(crosshairPos.x - 30, height - 20, 60, 20)
                 ctx.fillStyle = textColor
-                ctx.fillText(Qt.formatDate(date, "MM/dd"), crosshairPos.x, height - 5)
+                ctx.fillText(Qt.formatDate(date, "yyyy/MM/dd"), crosshairPos.x, height - 5)
 
                 // 成交量标签
                 ctx.textAlign = "right"
@@ -531,21 +537,21 @@ Item {
         width: 30
         
         Repeater {
-            model: 6
+            model: 3
             Text {
                 width: parent.width
-                height: parent.height / 6
-                text: (mainCanvas.minPrice + (5-index) * mainCanvas.priceRange/5).toFixed(2)
+                height: parent.height / 3
+                text: (mainCanvas.minPrice + (2-index) * mainCanvas.priceRange/2).toFixed(2)
                 color: textColor
                 font.pixelSize: 10
                 horizontalAlignment: Text.AlignLeft
                 verticalAlignment: index === 0 ? Text.AlignTop : 
-                              index === 5 ? Text.AlignBottom : Text.AlignVCenter
+                              index === 2 ? Text.AlignBottom : Text.AlignVCenter
             }
         }
     }
 
-    // Right Volume Scale
+
     Column {
         id: volumeScale
         anchors {
@@ -594,7 +600,7 @@ Item {
                 text: {
                     if (visibleData.length === 0) return ""
                     var idx = Math.round(index * (visibleData.length - 1) / 4)
-                    return Qt.formatDate(new Date(visibleData[idx].日期), "MM/dd")
+                    return Qt.formatDate(new Date(visibleData[idx].日期), "yyyy/MM/dd")
                 }
             }
         }
@@ -620,23 +626,89 @@ Item {
         }
     }
 
-    Button {
-        id: bollingerToggle
-        width: 100
-        height: 24
-        z: 1
+    // 技术指标按钮组
+    Row {
+        id: indicatorButtons
+        spacing: 5
         anchors.bottom: parent.top
         anchors.right: addMaButton.left
         anchors.margins: 5
-        text: showBollinger ? "隐藏布林带" : "显示布林带"
-        onClicked: showBollinger = !showBollinger
+        z: 1
         
-        contentItem: Text {
-            text: bollingerToggle.text
-            font: bollingerToggle.font
-            color: textColor
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
+        Button {
+            id: macdBtn
+            width: 60
+            height: 24
+            text: showMacd ? "隐藏MACD" : "MACD"
+            onClicked: {
+                currentIndicator = "MACD"
+                showMacd = !showMacd
+                showRsi = false
+                showKdj = false
+            }
+            contentItem: Text {
+                text: macdBtn.text
+                font: macdBtn.font
+                color: textColor
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
+        
+        Button {
+            id: rsiBtn
+            width: 60
+            height: 24
+            text: showRsi ? "隐藏RSI" : "RSI"
+            onClicked: {
+                currentIndicator = "RSI"
+                showRsi = !showRsi
+                showMacd = false
+                showKdj = false
+            }
+            contentItem: Text {
+                text: rsiBtn.text
+                font: rsiBtn.font
+                color: textColor
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
+        
+        Button {
+            id: kdjBtn
+            width: 60
+            height: 24
+            text: showKdj ? "隐藏KDJ" : "KDJ"
+            onClicked: {
+                currentIndicator = "KDJ"
+                showKdj = !showKdj
+                showMacd = false
+                showRsi = false
+            }
+            contentItem: Text {
+                text: kdjBtn.text
+                font: kdjBtn.font
+                color: textColor
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
+        
+        Button {
+            id: bollingerToggle
+            width: 80
+            height: 24
+            text: showBollinger ? "隐藏布林带" : "布林带"
+            onClicked: showBollinger = !showBollinger
+            
+            contentItem: Text {
+                text: bollingerToggle.text
+                font: bollingerToggle.font
+                color: textColor
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
         }
     }
 
@@ -762,7 +834,7 @@ Item {
         id: legend
         spacing: 5
         anchors.bottom: parent.top
-        anchors.right: bollingerToggle.left
+        anchors.right: indicatorButtons.left
         anchors.margins: 10
         visible: maSettings.length > 0
         layoutDirection: Qt.RightToLeft

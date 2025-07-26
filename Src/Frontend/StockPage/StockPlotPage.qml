@@ -10,8 +10,10 @@ Page {
     property string stockName: ""
     property var historyData: []
     property int currentScale: stockHeader.currentScale
-    property int totalYears: 5
-    property int currentSubChart: 0 // 0-none, 1-MACD, 2-RSI, 3-KDJ
+    property int totalYears: 10
+    property alias showMacd: stockChart.showMacd
+    property alias showRsi: stockChart.showRsi
+    property alias showKdj: stockChart.showKdj
     
     function setStockData(code, name) {
         stockCode = code
@@ -27,7 +29,11 @@ Page {
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
-
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            color: palette.mid
+        }
         StockHeader {
             id: stockHeader
             stockCode: root.stockCode
@@ -44,51 +50,24 @@ Page {
             historyData: root.historyData
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.minimumHeight: 300
         }
 
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 30
-            spacing: 5
-
-            ButtonGroup { id: subChartGroup }
-
-            Button {
-                text: "无"
-                checked: root.currentSubChart === 0
-                ButtonGroup.group: subChartGroup
-                onClicked: root.currentSubChart = 0
-            }
-            Button {
-                text: "MACD"
-                checked: root.currentSubChart === 1
-                ButtonGroup.group: subChartGroup
-                onClicked: root.currentSubChart = 1
-            }
-            Button {
-                text: "RSI"
-                checked: root.currentSubChart === 2
-                ButtonGroup.group: subChartGroup
-                onClicked: root.currentSubChart = 2
-            }
-            Button {
-                text: "KDJ"
-                checked: root.currentSubChart === 3
-                ButtonGroup.group: subChartGroup
-                onClicked: root.currentSubChart = 3
-            }
-        }
 
         Loader {
             id: subChartLoader
             Layout.fillWidth: true
-            Layout.preferredHeight: root.currentSubChart > 0 ? 150 : 0
+            Layout.preferredHeight: (root.showMacd || root.showRsi || root.showKdj)  ? root.height*0.2 : 0
+            Behavior on Layout.preferredHeight {
+                NumberAnimation {
+                    duration: 200  
+                    easing.type: Easing.InOutQuad  
+                }
+            }
             sourceComponent: {
-                if (root.currentSubChart === 1) return macdComponent
-                else if (root.currentSubChart === 2) return rsiComponent
-                else if (root.currentSubChart === 3) return kdjComponent
-                else return null
+                if (root.showMacd) return macdComponent
+                if (root.showRsi) return rsiComponent
+                if (root.showKdj) return kdjComponent
+                return null
             }
         }
 

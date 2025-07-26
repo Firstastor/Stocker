@@ -1,12 +1,13 @@
-"""
-新浪财经-沪深 A 股实时行情和历史K线数据获取
-"""
 import aiohttp, asyncio
 import json
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from PySide6.QtCore import QObject, Signal, Slot
+from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 import talib
+import torch
+import torch.nn as nn
 
 class StockCalculate(QObject):
     def __init__(self, parent=None):
@@ -353,18 +354,10 @@ class StockGet(QObject):
         self.stock_data = asyncio.run(self.async_get_stock_data())
         return self.stock_data
     
-import lightgbm as lgb
-import torch
-import torch.nn as nn
-from sklearn.preprocessing import MinMaxScaler
-
 class StockPrediction(QObject):
-    """股票预测类（集成LightGBM和LSTM模型）"""
-    training_progress = Signal(int, str)  # 训练进度信号（进度百分比, 状态消息）
-
     def __init__(self, parent=None):
         super().__init__(parent)
-        # LightGBM相关
+        # LGBM相关
         self.lgb_model = None
         self.lgb_scaler = MinMaxScaler()
         
@@ -373,165 +366,37 @@ class StockPrediction(QObject):
         self.lstm_scaler = MinMaxScaler()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # ==================== LightGBM 部分 ====================
+    # ==================== LGBM 部分 ====================
+    @Slot(np.ndarray, np.ndarray, result=bool)
     def train_lgbm(self, X_train, y_train, params=None):
         """训练LightGBM模型"""
         try:
-            # 数据标准化
             X_train_scaled = self.lgb_scaler.fit_transform(X_train)
             
-            # 默认参数（针对股票预测优化）
             if params is None:
                 params = {
                     'objective': 'regression',
                     'metric': 'rmse',
-                    'num_leaves': 63,
-                    'learning_rate': 0.01,
-                    'feature_fraction': 0.8,
-                    'bagging_fraction': 0.8,
-                    'bagging_freq': 5,
+                    'num_leaves': 255,
+                    'learning_rate': 0.05,
                     'verbose': -1
                 }
             
-            # 训练模型
             train_data = lgb.Dataset(X_train_scaled, label=y_train)
             self.lgb_model = lgb.train(
                 params,
                 train_data,
-                num_boost_round=200,
-                callbacks=[self._lgb_callback]
+                num_boost_round=100,
             )
             return True
         except Exception as e:
-            self.training_progress.emit(0, f"LightGBM训练错误: {str(e)}")
             return False
-
-    def _lgb_callback(self, env):
-        """LightGBM训练进度回调"""
-        progress = int(env.iteration / env.end_iteration * 100)
-        self.training_progress.emit(progress, "LightGBM训练中...")
-
-    # ==================== LSTM 部分 ====================
-    class LSTMModel(nn.Module):
-        """PyTorch LSTM模型定义"""
-        def __init__(self, input_size=1, hidden_size=50, num_layers=2, output_size=1):
-            super().__init__()
-            self.hidden_size = hidden_size
-            self.num_layers = num_layers
-            self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-            self.fc = nn.Linear(hidden_size, output_size)
         
-        def forward(self, x):
-            h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-            c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-            out, _ = self.lstm(x, (h0, c0))
-            out = self.fc(out[:, -1, :])
-            return out
+    @Slot(np.ndarray, result=list)
+    def predict_lgbm(self, X_test):
+        """使用LightGBM预测"""
+        if self.lgb_model is None:
+            raise ValueError("LightGBM模型未训练！")
+        X_test_scaled = self.lgb_scaler.transform(X_test)
+        return self.lgb_model.predict(X_test_scaled)
 
-    def train_lstm(self, X_train, y_train, epochs=100, seq_length=30):
-        """训练LSTM模型"""
-        try:
-            # 数据预处理
-            X_train_scaled = self.lstm_scaler.fit_transform(X_train)
-            y_train = y_train.reshape(-1, 1)
-            
-            # 转换为序列数据
-            X, y = self._create_sequences(X_train_scaled, y_train, seq_length)
-            
-            # 转换为PyTorch张量
-            X_tensor = torch.FloatTensor(X).to(self.device)
-            y_tensor = torch.FloatTensor(y).to(self.device)
-            
-            # 初始化模型
-            self.lstm_model = self.LSTMModel(
-                input_size=X_train.shape[1],
-                hidden_size=64,
-                num_layers=2
-            ).to(self.device)
-            
-            # 定义损失函数和优化器
-            criterion = nn.MSELoss()
-            optimizer = torch.optim.Adam(self.lstm_model.parameters(), lr=0.001)
-            
-            # 训练循环
-            for epoch in range(epochs):
-                optimizer.zero_grad()
-                outputs = self.lstm_model(X_tensor)
-                loss = criterion(outputs, y_tensor)
-                loss.backward()
-                optimizer.step()
-                
-                # 发射训练进度信号
-                progress = int((epoch + 1) / epochs * 100)
-                self.training_progress.emit(
-                    progress, 
-                    f"LSTM训练中 (Epoch {epoch+1}/{epochs}) Loss: {loss.item():.4f}"
-                )
-            return True
-        except Exception as e:
-            self.training_progress.emit(0, f"LSTM训练错误: {str(e)}")
-            return False
-
-    def _create_sequences(self, data, targets, seq_length):
-        """创建时间序列数据"""
-        X, y = [], []
-        for i in range(len(data) - seq_length):
-            X.append(data[i:i+seq_length])
-            y.append(targets[i+seq_length])
-        return np.array(X), np.array(y)
-
-    def predict_lstm(self, X_test, seq_length=30):
-        """使用LSTM进行预测"""
-        if self.lstm_model is None:
-            raise ValueError("LSTM模型未训练！")
-            
-        # 数据预处理
-        X_test_scaled = self.lstm_scaler.transform(X_test)
-        
-        # 转换为序列数据
-        X_seq = []
-        for i in range(len(X_test_scaled) - seq_length + 1):
-            X_seq.append(X_test_scaled[i:i+seq_length])
-        X_seq = np.array(X_seq)
-        
-        # 预测
-        with torch.no_grad():
-            X_tensor = torch.FloatTensor(X_seq).to(self.device)
-            preds = self.lstm_model(X_tensor).cpu().numpy()
-        
-        return preds.flatten()
-
-    # ==================== 通用功能 ====================
-    def save_model(self, model_type, filepath):
-        """保存指定类型的模型"""
-        if model_type == "lgbm":
-            if self.lgb_model:
-                self.lgb_model.save_model(filepath)
-            else:
-                raise ValueError("LightGBM模型未训练")
-        elif model_type == "lstm":
-            if self.lstm_model:
-                torch.save({
-                    'model_state_dict': self.lstm_model.state_dict(),
-                    'scaler_params': {
-                        'scale_': self.lstm_scaler.scale_,
-                        'min_': self.lstm_scaler.min_
-                    }
-                }, filepath)
-            else:
-                raise ValueError("LSTM模型未训练")
-        else:
-            raise ValueError("不支持的模型类型")
-
-    def load_model(self, model_type, filepath):
-        """加载预训练模型"""
-        if model_type == "lgbm":
-            self.lgb_model = lgb.Booster(model_file=filepath)
-        elif model_type == "lstm":
-            checkpoint = torch.load(filepath)
-            self.lstm_model = self.LSTMModel().to(self.device)
-            self.lstm_model.load_state_dict(checkpoint['model_state_dict'])
-            self.lstm_scaler.scale_ = checkpoint['scaler_params']['scale_']
-            self.lstm_scaler.min_ = checkpoint['scaler_params']['min_']
-        else:
-            raise ValueError("不支持的模型类型")

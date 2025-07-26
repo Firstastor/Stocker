@@ -14,7 +14,7 @@ Item {
     property var visibleMacd: []
 
     property color textColor: palette.text
-    property color gridColor: "#e0e0e0"
+    property color gridColor: palette.mid
     property color positiveColor: "red"
     property color negativeColor: "green"
     property color lineColor: "#3498db"
