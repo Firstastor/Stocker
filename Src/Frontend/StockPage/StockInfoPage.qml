@@ -6,12 +6,17 @@ import QtQuick.Window
 
 Page {
     id: root
-    property string sortField: "代码"
+    
     property bool sortAscending: true
+    property string sortField: "代码"
     property string filterString: ""
     property var stockData: []
+    property var allStockData: []  // 保存所有股票数据
+    property int currentIndex: 0
+    property var favoriteStocks: []
     
     signal stockSelected(string code, string name)
+    signal favoritesChanged(var favorites)
     
     function updateSort(field) {
         if (sortField === field) {
@@ -24,13 +29,49 @@ Page {
     }
     
     function applySortAndFilter() {
-        var filtered = StockGet.filter_stock_data(searchField.text)
+        var filtered = []
+        
+        // 首先应用搜索过滤
+        if (filterString) {
+            filtered = StockGet.filter_stock_data(allStockData, filterString)
+        } else {
+            filtered = allStockData.slice()  // 创建副本
+        }
+        
+        // 如果是自选股页面，只显示自选股
+        if (currentIndex === 1) {
+            filtered = filtered.filter(item => favoriteStocks.includes(item.代码))
+        }
+        
+        // 最后应用排序
         stockData = StockGet.sort_stock_data(filtered, sortField, sortAscending)
     }
     
+    function toggleFavorite(code) {
+        if (favoriteStocks.includes(code)) {
+            favoriteStocks = favoriteStocks.filter(item => item !== code)
+        } else {
+            favoriteStocks.push(code)
+        }
+        favoritesChanged(favoriteStocks)
+        applySortAndFilter()
+        StockGet.save_favorite_stocks(favoriteStocks)
+    }
+    
+    function isFavorite(code) {
+        return favoriteStocks.includes(code)
+    }
+    
     Component.onCompleted: {
-        // Initialize with all stock data
-        stockData = StockGet.get_stock_data()
+        // 加载自选股列表
+        favoriteStocks = StockGet.load_favorite_stocks()
+        // 加载股票数据
+        allStockData = StockGet.get_stock_data()
+        applySortAndFilter()
+    }
+    
+    onCurrentIndexChanged: {
+        applySortAndFilter()
     }
     
     ColumnLayout {
@@ -53,6 +94,7 @@ Page {
                 radius: 4
             }
             onTextChanged: {
+                root.filterString = text
                 applySortAndFilter()
             }
         }
@@ -140,7 +182,26 @@ Page {
                         id: mouseArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: root.stockSelected(modelData.代码, modelData.名称)
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: function(mouse) {
+                            if (mouse.button === Qt.LeftButton) {
+                                root.stockSelected(modelData.代码, modelData.名称)
+                            }
+                        }
+                        onPressed: function(mouse) {
+                            if (mouse.button === Qt.RightButton) {
+                                contextMenu.popup()
+                            }
+                        }
+                    }
+
+                    // 右键菜单
+                    Menu {
+                        id: contextMenu
+                        MenuItem {
+                            text: root.isFavorite(modelData.代码) ? qsTr("从自选股中移除") : qsTr("加入自选股")
+                            onTriggered: root.toggleFavorite(modelData.代码)
+                        }
                     }
 
                     RowLayout {
@@ -195,6 +256,7 @@ Page {
                             color: getPriceColor(modelData.涨跌, mouseArea.containsMouse)
                         }
                     }
+
                 }
             }
 
@@ -211,7 +273,7 @@ Page {
     component HeaderButton : Button {
         property string sortField: ""
         property string currentSortField: ""
-        property bool ascending: true
+        property bool ascending: false
         flat: true
         font.bold: true
         readonly property string displayText: {
@@ -237,9 +299,9 @@ Page {
 
     function getPriceColor(value, isHovered) {
         if (value > 0) {
-            return isHovered ? "#aaffaa" : "#00aa00"
-        } else if (value < 0) {
             return isHovered ? "#ffaaaa" : "#aa0000"
+        } else if (value < 0) {
+            return isHovered ? "#aaffaa" : "#00aa00"
         }
         return isHovered ? palette.highlightedText : palette.text
     }

@@ -8,6 +8,7 @@ Page {
     id: root
     property string stockCode: ""
     property string stockName: ""
+    property var stockData: []
     property var historyData: []
     property int currentScale: stockHeader.currentScale
     property int totalYears: 10
@@ -39,6 +40,7 @@ Page {
             stockCode: root.stockCode
             stockName: root.stockName
             Layout.fillWidth: true
+            stockData: root.stockData
             onScaleSelected: function(newScale) {
                 root.currentScale = newScale
                 root.refreshData()
@@ -55,8 +57,9 @@ Page {
 
         Loader {
             id: subChartLoader
-            Layout.fillWidth: true
+            Layout.preferredWidth: parent.width - 60
             Layout.preferredHeight: (root.showMacd || root.showRsi || root.showKdj)  ? root.height*0.2 : 0
+            Layout.alignment: Qt.AlignCenter
             Behavior on Layout.preferredHeight {
                 NumberAnimation {
                     duration: 200  

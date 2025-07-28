@@ -155,7 +155,6 @@ Item {
     }
 
     onMaSettingsChanged: {
-        // Update MA calculations for any new or changed settings
         for (var i = 0; i < maSettings.length; i++) {
             var setting = maSettings[i]
             if (!setting.maData || setting.maData.length === 0) {
@@ -559,7 +558,7 @@ Item {
             top: parent.top
             bottom: dateScale.top
         }
-        width: 40
+        width: 30
         
         Repeater {
             model: 3

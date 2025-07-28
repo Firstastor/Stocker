@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 Window {
     id: mainWindow
-    width: 1280
+    width: 1440
     height: 900
     title: qsTr("Stocker")
     visible: true
@@ -26,12 +26,27 @@ Window {
             Layout.fillHeight: true
             spacing: 0
 
+            SideBar {
+                id: sideBar
+                Layout.preferredWidth: 120
+                Layout.fillHeight: true
+                onSwitchPage: function(index) {
+                    if (index === 0) {
+                        stockPage.stockInfoPage.currentIndex = 0
+                    } else if (index === 1) {
+                        stockPage.stockInfoPage.currentIndex = 1
+                    }
+                }
+            }
+
             StackLayout {
                 id: stackLayout
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                currentIndex: 0
                 
                 StockPage {
+                    id: stockPage
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                 }

@@ -9,6 +9,7 @@ Page {
     property bool stockSelected: false
     property string selectedStockCode: ""
     property string selectedStockName: ""
+    property alias stockInfoPage: stockInfoPage
 
     Item {
         anchors.fill: parent
@@ -28,6 +29,7 @@ Page {
                     root.selectedStockName = name
                     stockPlotPage.setStockData(code, name)
                     stockPredicationPage.setStockData(code, name)
+                    stockPredicationPage.refreshSignals()
                 }
             }
 
@@ -51,13 +53,29 @@ Page {
                     id: stockPlotPage
                     width: parent.width
                     height: parent.height * 0.5
+                    stockData: stockInfoPage.stockData
                 }
 
                 StockPredicationPage {
                     id: stockPredicationPage
                     width: parent.width
                     height: parent.height * 0.5
+                    stockData: stockInfoPage.stockData
+                    historyData: stockPlotPage.historyData
                 }
+            }
+        }
+    }
+
+    // 修改后的连接，只更新筛选状态
+    Connections {
+        target: sideBar
+        function onSwitchPage(index) {
+            stockInfoPage.currentIndex = index
+            stockInfoPage.applySortAndFilter()
+            // 重置搜索条件
+            if (index === 1) {
+                stockInfoPage.applySortAndFilter()
             }
         }
     }

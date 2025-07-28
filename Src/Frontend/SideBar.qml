@@ -5,22 +5,18 @@ import QtQuick.Layouts
 import QtQuick.Window 
 
 Rectangle {
-
     color: palette.window
-
     signal switchPage(int index)
-    property int currentIndex: 0
+    property int currentIndex: 0  // 添加当前索引属性
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 10
 
         Button {
-            id: pushbtndownload
             Layout.alignment: Qt.AlignCenter
-            icon.source: "../Image/download.png"
             display: AbstractButton.TextUnderIcon
-            text: qsTr("股票")
+            text: qsTr("全部股票")
             flat: true
             highlighted: parent.parent.currentIndex === 0
             onClicked: {
@@ -28,21 +24,30 @@ Rectangle {
                 switchPage(0)
             }
         }
-        Item {
-            Layout.fillHeight: true
-            Layout.fillWidth: true
-        }
         Button {
-            id: pushbtnsetting
             Layout.alignment: Qt.AlignCenter
-            icon.source: "../Image/setting.png"
             display: AbstractButton.TextUnderIcon
-            text: qsTr("设置")
+            text: qsTr("自选股")
             flat: true
             highlighted: parent.parent.currentIndex === 1
             onClicked: {
                 parent.parent.currentIndex = 1
                 switchPage(1)
+            }
+        }
+        Item {
+            Layout.fillHeight: true
+            Layout.fillWidth: true
+        }
+        Button {
+            Layout.alignment: Qt.AlignCenter
+            display: AbstractButton.TextUnderIcon
+            text: qsTr("设置")
+            flat: true
+            highlighted: parent.parent.currentIndex === 2
+            onClicked: {
+                parent.parent.currentIndex = 2
+                switchPage(2)
             }
         }
     }
