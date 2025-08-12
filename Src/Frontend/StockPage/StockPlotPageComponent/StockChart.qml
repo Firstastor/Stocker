@@ -61,6 +61,7 @@ Item {
         if (showBollinger) {
             calculateBollingerBands()
         }
+        // 更新MA数据时计算完整数据
         for (var i = 0; i < maSettings.length; i++) {
             var setting = maSettings[i]
             setting.maData = calculateMA(setting.period, setting.type)
@@ -85,18 +86,16 @@ Item {
         var maValues = type === "EMA" 
             ? StockCalculate.calculate_ema(closePrices, period)
             : StockCalculate.calculate_sma(closePrices, period)
-        if (maValues.length === 0) return []
         
-        var visibleMA = []
+        // 返回完整数据而不是可见部分
+        var fullMA = []
         for (var i = 0; i < maValues.length; i++) {
-            if (i >= startIndex && i < startIndex + visibleDays) {
-                visibleMA.push({
-                    value: maValues[i],
-                    index: i
-                })
-            }
+            fullMA.push({
+                value: maValues[i],
+                index: i
+            })
         }
-        return visibleMA
+        return fullMA
     }
 
     function updateVisibleData(newStartIndex) {
@@ -197,7 +196,7 @@ Item {
             var volumeRange = Math.max(1, maxVolume)
 
             // 成交量柱子高度最大只占K线区底部20%
-            var volumeBarMaxHeight = height * 0.4
+            var volumeBarMaxHeight = height * 0.2
             var volumeBarBaseY = height
 
             // 绘制网格线（全高）
@@ -311,11 +310,19 @@ Item {
                     var firstPoint = true
                     for (var m = 0; m < setting.maData.length; m++) {
                         var maItem = setting.maData[m]
+                        // 计算x坐标时考虑startIndex偏移
                         var relativeIndex = maItem.index - startIndex
-                        if (relativeIndex < 0 || relativeIndex >= visibleData.length) continue
+                        if (relativeIndex < -1 || relativeIndex > visibleDays) continue
                         
                         var maX = (relativeIndex + 0.5) * (barWidth + barSpacing)
                         var maY = height - ((maItem.value - minPrice) / priceRange * height)
+                        
+                        // 如果点不在可视区域内，跳过或移动到边界
+                        if (relativeIndex < 0) {
+                            maX = -barWidth/2
+                        } else if (relativeIndex >= visibleDays) {
+                            maX = width + barWidth/2
+                        }
                         
                         if (firstPoint) {
                             ctx.moveTo(maX, maY)
