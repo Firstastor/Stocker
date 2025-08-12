@@ -1,14 +1,10 @@
 import aiohttp, asyncio
 import json
-import lightgbm as lgb
 import numpy as np
 import os
-import pandas as pd
-from PySide6.QtCore import QObject, Signal, Slot
-from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
+from PySide6.QtCore import QObject, Slot
 import talib
-import torch
-import torch.nn as nn
+
 
 class StockCalculate(QObject):
     def __init__(self, parent=None):
@@ -872,34 +868,4 @@ class StockGet(QObject):
         self.stock_data = asyncio.run(self.async_get_stock_data())
         return self.stock_data
     
-class StockPrediction(QObject):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        # LGBM相关
-        self.lgb_model = None
-        self.lgb_scaler = MinMaxScaler()
-
-    # ==================== LGBM 部分 ====================
-    @Slot(np.ndarray, np.ndarray, result=bool)
-    def train_lgbm(self, X_train, y_train):
-        """训练LightGBM模型"""
-        try:
-            params = {
-                'objective': 'regression',
-                'metric': 'rmse',
-                'num_leaves': 255,
-                'learning_rate': 0.05,
-                'verbose': -1
-            }
-            
-            train_data = lgb.Dataset(X_train, label=y_train)
-            self.lgb_model = lgb.train(
-                params,
-                train_data,
-                num_boost_round=100,
-            )
-            return True
-        except Exception as e:
-            return False
-        
         

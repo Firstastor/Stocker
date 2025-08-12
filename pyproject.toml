@@ -1,28 +1,5 @@
 [project]
-<<<<<<< HEAD
 name = "stocker"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.13"
-dependencies = [
-    "aiohttp>=3.12.14",
-    "bayesian-optimization>=3.1.0",
-    "hyperopt>=0.2.7",
-    "lightgbm>=4.6.0",
-    "packaging>=25.0",
-    "pandas>=2.3.1",
-    "pyside6>=6.9.1",
-    "requests>=2.32.4",
-    "scikit-learn>=1.7.1",
-    "ta-lib>=0.6.4",
-    "torch>=2.7.1",
-]
-
-[[tool.uv.index]]
-url = "http://pypi.tuna.tsinghua.edu.cn/simple"
-=======
-name = "Stocker"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -31,7 +8,6 @@ dependencies = [
     "aiohttp>=3.12.15",
     "cupy-cuda12x>=13.5.1",
     "lightgbm>=4.6.0",
-    "matplotlib>=3.10.5",
     "numpy>=2.3.2",
     "pandas>=2.3.1",
     "plotly>=6.2.0",
@@ -44,5 +20,4 @@ dependencies = [
 
 [[tool.uv.index]]
 url = "https://pypi.mirrors.ustc.edu.cn/simple/"
->>>>>>> master
 default = true

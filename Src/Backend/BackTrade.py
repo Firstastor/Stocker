@@ -4,8 +4,6 @@ import json
 from lightgbm import LGBMRegressor
 import numpy as np
 import os
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import polars as pl
 from sklearn.decomposition import PCA
 from sklearn.ensemble import GradientBoostingRegressor, HistGradientBoostingRegressor, RandomForestRegressor
@@ -179,104 +177,6 @@ class BackTrade:
         print(f"夏普比率: {self.stats['SharpeRatio']:.2f}")
         print(f"索提诺比率: {self.stats['SortinoRatio']:.2f}")
         print(f"卡玛比率: {self.stats['CalmarRatio']:.2f}")
-
-    def plot(self, show_drawdown=True):
-        """
-        使用Plotly绘制K线+买卖信号+净值曲线
-        """
-        if self.results is None:
-            raise ValueError("请先运行回测")
-        df = self.data
-        res = self.results
-        trades = pl.DataFrame(self.trades) if self.trades else None
-        fig = make_subplots(
-            rows=2, cols=1,
-            shared_xaxes=True,
-            vertical_spacing=0.05,
-            row_heights=[0.7, 0.3],
-            subplot_titles=("K线 & 交易信号", "策略净值")
-        )
-        candle = go.Candlestick(
-            x=df['Date'].to_numpy(),
-            open=df['Open'].to_numpy(),
-            high=df['High'].to_numpy(),
-            low=df['Low'].to_numpy(),
-            close=df['Close'].to_numpy(),
-            name='K线',
-            increasing_line_color='#089981',
-            decreasing_line_color='#f23645'
-        )
-        fig.add_trace(candle, row=1, col=1)
-        if trades is not None and trades.height > 0:
-            fig.add_trace(go.Scatter(
-                x=trades['EntryDate'].to_numpy(),
-                y=trades['EntryPrice'].to_numpy(),
-                mode='markers',
-                marker=dict(symbol='triangle-up', size=10, color='#00b746'),
-                name='买入'
-            ), row=1, col=1)
-            fig.add_trace(go.Scatter(
-                x=trades['ExitDate'].to_numpy(),
-                y=trades['ExitPrice'].to_numpy(),
-                mode='markers',
-                marker=dict(symbol='triangle-down', size=10, color='#ff2e4d'),
-                name='卖出'
-            ), row=1, col=1)
-        equity = res['Equity'].to_numpy()
-        dates = res['Date'].to_numpy()
-        fig.add_trace(go.Scatter(
-            x=dates,
-            y=equity,
-            mode='lines',
-            line=dict(color='#2962FF', width=2),
-            name='策略净值'
-        ), row=2, col=1)
-        fig.add_trace(go.Scatter(
-            x=dates,
-            y=[self.init_cash] * len(equity),
-            mode='lines',
-            line=dict(color='#78909C', width=1, dash='dash'),
-            name='初始资金'
-        ), row=2, col=1)
-        if show_drawdown and 'MaxDrawdown' in self.stats:
-            peak = np.maximum.accumulate(equity)
-            drawdown = (peak - equity) / peak
-            max_dd_idx = np.argmax(drawdown)
-            peak_before = np.argmax(equity[:max_dd_idx]) if max_dd_idx > 0 else 0
-
-            fig.add_vrect(
-                x0=dates[peak_before],
-                x1=dates[max_dd_idx],
-                fillcolor="rgba(244, 67, 54, 0.2)",
-                layer="below",
-                line_width=0,
-                row=2, col=1
-            )
-            fig.add_annotation(
-                x=dates[max_dd_idx],
-                y=equity[max_dd_idx],
-                text=f"最大回撤: {self.stats['MaxDrawdown']:.2f}%",
-                showarrow=True,
-                arrowhead=1,
-                font=dict(color='#ff5252'),
-                row=2, col=1
-            )
-        fig.update_layout(
-            title=dict(text='回测结果', x=0.5, xanchor='center'),
-            template='plotly_dark',
-            legend=dict(
-                orientation='h',
-                yanchor='bottom',
-                y=1.02,
-                xanchor='right',
-                x=1
-            ),
-            hovermode='x unified'
-        )
-        fig.update_xaxes(rangeslider_visible=False)
-        fig.update_yaxes(title_text='价格', row=1, col=1)
-        fig.update_yaxes(title_text='净值', row=2, col=1)
-        return fig.show()
 
 class BackTradeData:
     def __init__(self):
