@@ -44,30 +44,15 @@ Page {
             height: parent.height
             anchors.right: parent.right
             clip: true
-
-            Column {
-                anchors.fill: parent
-                spacing: 5
-
-                StockPlotPage {
-                    id: stockPlotPage
-                    width: parent.width
-                    height: parent.height * 0.5
-                    stockData: stockInfoPage.stockData
-                }
-
-                StockPredicationPage {
-                    id: stockPredicationPage
-                    width: parent.width
-                    height: parent.height * 0.5
-                    stockData: stockInfoPage.stockData
-                    historyData: stockPlotPage.historyData
-                }
+            StockPlotPage {
+                id: stockPlotPage
+                width: parent.width
+                height: parent.height * 0.5
+                stockData: stockInfoPage.stockData
             }
         }
     }
 
-    // 修改后的连接，只更新筛选状态
     Connections {
         target: sideBar
         function onSwitchPage(index) {

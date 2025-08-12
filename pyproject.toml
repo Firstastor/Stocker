@@ -9,7 +9,6 @@ dependencies = [
     "cupy-cuda12x>=13.5.1",
     "lightgbm>=4.6.0",
     "numpy>=2.3.2",
-    "pandas>=2.3.1",
     "plotly>=6.2.0",
     "polars>=1.32.2",
     "pyside6>=6.9.1",
