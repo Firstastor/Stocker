@@ -5,13 +5,14 @@ import QtQuick.Layouts
 
 Window {
     id: mainWindow
-    width: 1440
+    width: 1600
     height: 900
     title: qsTr("Stocker")
     visible: true
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
-
+    visibility: Window.FullScreen
+    
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -21,6 +22,7 @@ Window {
             Layout.fillWidth: true
             Layout.preferredHeight: 40
         }
+
         RowLayout{
             Layout.fillWidth: true
             Layout.fillHeight: true

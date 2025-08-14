@@ -11,7 +11,7 @@ Page {
     property string sortField: "代码"
     property string filterString: ""
     property var stockData: []
-    property var allStockData: []  // 保存所有股票数据
+    property var allStockData: [] 
     property int currentIndex: 0
     property var favoriteStocks: []
     
@@ -30,20 +30,14 @@ Page {
     
     function applySortAndFilter() {
         var filtered = []
-        
-        // 首先应用搜索过滤
         if (filterString) {
             filtered = StockGet.filter_stock_data(allStockData, filterString)
         } else {
-            filtered = allStockData.slice()  // 创建副本
+            filtered = allStockData.slice()
         }
-        
-        // 如果是自选股页面，只显示自选股
         if (currentIndex === 1) {
             filtered = filtered.filter(item => favoriteStocks.includes(item.代码))
         }
-        
-        // 最后应用排序
         stockData = StockGet.sort_stock_data(filtered, sortField, sortAscending)
     }
     
@@ -63,9 +57,7 @@ Page {
     }
     
     Component.onCompleted: {
-        // 加载自选股列表
         favoriteStocks = StockGet.load_favorite_stocks()
-        // 加载股票数据
         allStockData = StockGet.get_stock_data()
         applySortAndFilter()
     }
@@ -78,7 +70,6 @@ Page {
         anchors.fill: parent
         spacing: 0
 
-        // 搜索框
         TextField {
             id: searchField
             Layout.fillWidth: true

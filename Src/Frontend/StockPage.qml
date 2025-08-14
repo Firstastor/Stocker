@@ -16,7 +16,7 @@ Page {
 
         Item {
             id: leftPanel
-            width: stockSelected ? 350 : parent.width
+            width: stockSelected ? 300 : parent.width
             height: parent.height
             anchors.left: parent.left
 
@@ -28,8 +28,6 @@ Page {
                     root.selectedStockCode = code
                     root.selectedStockName = name
                     stockPlotPage.setStockData(code, name)
-                    stockPredicationPage.setStockData(code, name)
-                    stockPredicationPage.refreshSignals()
                 }
             }
 
@@ -47,7 +45,7 @@ Page {
             StockPlotPage {
                 id: stockPlotPage
                 width: parent.width
-                height: parent.height * 0.5
+                height: parent.height
                 stockData: stockInfoPage.stockData
             }
         }
@@ -58,7 +56,6 @@ Page {
         function onSwitchPage(index) {
             stockInfoPage.currentIndex = index
             stockInfoPage.applySortAndFilter()
-            // 重置搜索条件
             if (index === 1) {
                 stockInfoPage.applySortAndFilter()
             }

@@ -24,6 +24,7 @@ Rectangle {
                 switchPage(0)
             }
         }
+
         Button {
             Layout.alignment: Qt.AlignCenter
             display: AbstractButton.TextUnderIcon
@@ -35,6 +36,19 @@ Rectangle {
                 switchPage(1)
             }
         }
+
+        Button {
+            Layout.alignment: Qt.AlignCenter
+            display: AbstractButton.TextUnderIcon
+            text: qsTr("回测")
+            flat: true
+            highlighted: parent.parent.currentIndex === 2
+            onClicked: {
+                parent.parent.currentIndex = 2
+                switchPage(2)
+            }
+        }
+
         Item {
             Layout.fillHeight: true
             Layout.fillWidth: true
@@ -44,10 +58,10 @@ Rectangle {
             display: AbstractButton.TextUnderIcon
             text: qsTr("设置")
             flat: true
-            highlighted: parent.parent.currentIndex === 2
+            highlighted: parent.parent.currentIndex === 3
             onClicked: {
-                parent.parent.currentIndex = 2
-                switchPage(2)
+                parent.parent.currentIndex = 3
+                switchPage(3)
             }
         }
     }

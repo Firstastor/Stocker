@@ -1,6 +1,7 @@
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
-from Src.Backend.Stock import StockCalculate, StockGet
+from Src.Backend.stock_calculate import StockCalculate
+from Src.Backend.stock_data import StockGet
 import sys
 
 if __name__ == "__main__":
